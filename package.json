@@ -1,0 +1,29 @@
+{
+  "name": "restapps",
+  "version": "0.0.1",
+  "description": "restapps",
+  "scripts": {
+    "tsc": "tsc",
+    "start": "npx ts-node-dev --respawn --transpile-only --debug ./src/index.ts",
+    "prod": "tsc -p tsconfig.json && cp .env ./build/.env  && pkg --targets node16-linux-x64 --output webhook_restapps ./build/index.js ",
+    "format": "prettier --write ."
+  },
+  "author": {
+    "name": "Fery Rahmadz",
+    "email": "yaelahferr@gmail.com"
+  },
+  "devDependencies": {
+    "@types/node": "^16.10.3",
+    "eslint": "^8.30.0",
+    "pkg": "^5.8.0",
+    "prettier": "2.8.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.1",
+    "github-webhook-handler": "^1.0.0",
+    "node-telegram-bot-api": "^0.61.0",
+    "reflect-metadata": "^0.1.10"
+  }
+}
