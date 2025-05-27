@@ -49,7 +49,7 @@ Creating a new **_hotfix_**
 
 ### How to install
 
-1. clone this repo [webhook-serviceg](#) into `nodejs/path/`
+1. clone this repo [webhook-service](#) into `nodejs/path/`
 1. go to webhook-on-premise `cd nodejs/path/api-on-premise`
 1. copy env-example into .env `cp env-example .env`
 1. ajust config in .env
