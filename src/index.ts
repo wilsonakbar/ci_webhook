@@ -2,68 +2,87 @@ import 'reflect-metadata'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
 import * as http from 'http'
-const createHandler = require('github-webhook-handler')
-const handler = createHandler({ path: '/rahmadz', secret: 'rahmadz' })
-const execFile = require('child_process').execFile
 import * as TelegramBot from 'node-telegram-bot-api'
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN)
+import { execFile } from 'child_process'
+const createHandler = require('github-webhook-handler')
 
-const dotenvAbsolutePath = path.join(__dirname, '../.env')
-dotenv.config({
-  path: dotenvAbsolutePath
+dotenv.config({ path: path.join(__dirname, '../.env') })
+
+const REQUIRED_ENV = ['TELEGRAM_TOKEN', 'TELEGRAM_CHAT', 'APP_PORT', 'APP_MODULE', 'APP_NAME', 'APP_DOMAIN']
+REQUIRED_ENV.forEach((key) => {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`)
+  }
 })
 
-main()
+const { TELEGRAM_TOKEN, TELEGRAM_CHAT, APP_PORT, APP_MODULE, APP_NAME, APP_DOMAIN } = process.env
 
-function main(): any {
-  http
-    .createServer(function (req, res) {
-      handler(req, res, function (err) {
-        res.statusCode = 404
-        res.end('no such location')
-      })
-    })
-    .listen(process.env.APP_PORT, () => {
-      console.log(`Service ${process.env.APP_MODULE} listen on port ${process.env.APP_PORT}`)
-    })
+const bot = new TelegramBot(TELEGRAM_TOKEN)
 
-  handler.on('error', function (err) {
-    console.error('Error:', err.message)
+const handler = createHandler({
+  path: '/backend',
+  secret: 'backend'
+})
+
+http
+  .createServer((req, res) => {
+    handler(req, res, () => {
+      res.statusCode = 404
+      res.end('No such location')
+    })
+  })
+  .listen(Number(APP_PORT), () => {
+    console.log(`[✅] ${APP_MODULE} listening on port ${APP_PORT}`)
   })
 
-  handler.on('push', function (event) {
-    console.log('Received a push event for %s to %s', event.payload.repository.name, event.payload.ref)
-    bot.sendMessage(
-      process.env.TELEGRAM_CHAT,
-      'Hello, Your' +
-        process.env.APP_MODULE +
-        process.env.APP_NAME +
-        'has has started new deployment. Date : ' +
-        new Date() +
-        '. Domain : ' +
-        process.env.APP_DOMAIN +
-        '  Thanks You!'
-    )
-    const execOptions = {
-      maxBuffer: 1024 * 1024
+handler.on('error', (err: Error) => {
+  console.error('[Webhook Error]', err.message)
+})
+
+handler.on('push', async (event: any) => {
+  const repo = event.payload.repository.name
+  const branch = event.payload.ref
+  const date = new Date().toLocaleString()
+
+  console.log(`[🚀] Push event for ${repo} to ${branch}`)
+
+  const startMessage = `🚀 Hello, Your ${APP_MODULE} ${APP_NAME} has started new deployment.
+
+ 🕒 ${date}
+ 🌐 ${APP_DOMAIN}
+
+ Thank You!`
+
+  await sendMessage(startMessage)
+
+  execFile('/root/webhook/restapps/deploy.sh', { maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+    if (error) {
+      console.error('[Deploy Error]', error)
+      const failedMessage = `❌ Deployment Failed.
+
+ 🕒 ${date}
+ 🐒 ${error.message}
+
+ Thank You!`
+
+      return sendMessage(failedMessage)
     }
 
-    execFile('/root/webhook/restapps/deploy.sh', execOptions, function (error, stdout, stderr) {
-      if (error) {
-        console.log(error)
-        return bot.sendMessage(process.env.TELEGRAM_CHAT, error.message)
-      }
-      return bot.sendMessage(
-        process.env.TELEGRAM_CHAT,
-        'Yay, Your' +
-          process.env.APP_MODULE +
-          process.env.APP_NAME +
-          'has completed deployment. Date : ' +
-          new Date() +
-          '. Domain : ' +
-          process.env.APP_DOMAIN +
-          '  Thanks You!'
-      )
-    })
+    const finishMessage = `✅ Yay, Your ${APP_MODULE} ${APP_NAME} has completed deployment.
+
+ 🕒 ${date}
+ 🌐 ${APP_DOMAIN}
+
+ Thank You!`
+
+    await sendMessage(finishMessage)
   })
+})
+
+async function sendMessage(message: string) {
+  try {
+    await bot.sendMessage(TELEGRAM_CHAT!, message)
+  } catch (err) {
+    console.error('[Telegram Error]', err)
+  }
 }
